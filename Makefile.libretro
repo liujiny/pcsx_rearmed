@@ -324,6 +324,56 @@ else ifeq ($(platform), psp1)
 	HAVE_PHYSICAL_CDROM = 0
 	USE_LIBRETRO_VFS = 0
 
+# Sony PlayStation 4 loadable libretro SELF (OrbisDev + OpenOrbis)
+else ifeq ($(platform), orbis-dynamic)
+	ifeq ($(strip $(ORBISDEV)),)
+		$(error "Please set ORBISDEV in your environment")
+	endif
+	ifeq ($(strip $(OO_PS4_TOOLCHAIN)),)
+		$(error "Please set OO_PS4_TOOLCHAIN in your environment")
+	endif
+	TARGET := $(TARGET_NAME)_libretro.elf
+	CC := clang
+	CXX := clang++
+	CC_LINK := clang++
+	LD := ld.lld
+	ARCH := x86_64
+	DYNAREC := lightrec
+	BUILTIN_GPU := neon
+	HAVE_PHYSICAL_CDROM := 1
+	PLATFORM_DEFINES += -DORBIS -D__ORBIS__ -D__PS4__ -D_BSD_SOURCE
+	CFLAGS += $(PLATFORM_DEFINES)
+	CXXFLAGS += $(PLATFORM_DEFINES)
+	ENDIANNESS_DEFINES := -DLSB_FIRST
+	fpic :=
+	CFLAGS += --target=x86_64-pc-freebsd12-elf -nostdinc -isysroot $(ORBISDEV)
+	CFLAGS += -isystem $(OO_PS4_TOOLCHAIN)/include
+	CFLAGS += -isystem $(shell $(CC) -print-resource-dir)/include
+	CFLAGS += -fshort-wchar -fPIC
+	CXXFLAGS += --target=x86_64-pc-freebsd12-elf -nostdinc -isysroot $(ORBISDEV)
+	CXXFLAGS += -isystem $(OO_PS4_TOOLCHAIN)/include
+	CXXFLAGS += -isystem $(OO_PS4_TOOLCHAIN)/include/c++/v1
+	CXXFLAGS += -isystem $(shell $(CC) -print-resource-dir)/include
+	CXXFLAGS += -fshort-wchar -fPIC -fno-rtti
+	LDFLAGS += -nostdlib -nostartfiles -fuse-ld=lld -Wl,-m,elf_x86_64 -Wl,-pie -Wl,--export-dynamic
+	LDFLAGS += -Wl,--script,$(OO_PS4_TOOLCHAIN)/link.x -Wl,--eh-frame-hdr
+	LDFLAGS += -Wl,--version-script=frontend/libretro-version-script
+	LDFLAGS += -Wl,--allow-multiple-definition
+	LDLIBS := $(filter-out -lm,$(LDLIBS))
+	LDLIBS += $(OO_PS4_TOOLCHAIN)/lib/crtlib.o
+	PS4_DYNAMIC_ALLOCATOR_DIR := $(CURDIR)/.orbis-dynamic-allocator
+	PS4_DYNAMIC_ALLOCATOR_NAMES := malloc.lo strdup.lo __errno_location.lo expand_heap.lo libc.lo madvise.lo mmap.lo mremap.lo munmap.lo __wait.lo
+	PS4_DYNAMIC_ALLOCATOR_OBJECTS := $(addprefix $(PS4_DYNAMIC_ALLOCATOR_DIR)/,$(PS4_DYNAMIC_ALLOCATOR_NAMES))
+	PS4_DYNAMIC_ALLOCATOR_STAMP := $(PS4_DYNAMIC_ALLOCATOR_DIR)/.ready
+	LDLIBS += $(PS4_DYNAMIC_ALLOCATOR_OBJECTS)
+	LDLIBS += -L$(OO_PS4_TOOLCHAIN)/lib $(OO_PS4_TOOLCHAIN)/lib/libc++.a $(OO_PS4_TOOLCHAIN)/lib/libc++abi.a $(OO_PS4_TOOLCHAIN)/lib/libunwind.a $(OO_PS4_TOOLCHAIN)/lib/libpthread.a $(OO_PS4_TOOLCHAIN)/lib/libc.a
+	EXTRA_DEPS += $(PS4_DYNAMIC_ALLOCATOR_STAMP)
+	PS4_DYNAMIC_STUB_DIR := $(CURDIR)/.orbis-dynamic-stubs
+	PS4_DYNAMIC_STUBS := $(PS4_DYNAMIC_STUB_DIR)/libkernel.so $(PS4_DYNAMIC_STUB_DIR)/libSceLibcInternal.so
+	EXTRA_DEPS += $(PS4_DYNAMIC_STUBS)
+	LDLIBS += -L$(PS4_DYNAMIC_STUB_DIR) -lkernel -lSceLibcInternal
+	HAVE_RZLIB := 1
+
 # Vita
 else ifeq ($(platform), vita)
 	TARGET := $(TARGET_NAME)_libretro_vita.a
@@ -643,6 +693,14 @@ CFLAGS += $(fpic)
 MAIN_LDFLAGS += -shared
 MAIN_LDLIBS += $(LIBPTHREAD) $(LIBM) $(LIBDL) $(LIBZ)
 
+# Orbis dynamic cores are PIE executables loaded as SELF modules, not ELF
+# shared objects. Keep the common libretro flags above for other platforms,
+# but remove -shared for this target.
+ifeq ($(platform),orbis-dynamic)
+MAIN_LDFLAGS := $(filter-out -shared,$(MAIN_LDFLAGS))
+MAIN_LDLIBS := $(filter-out -ldl,$(MAIN_LDLIBS))
+endif
+
 # enable large file support if available
 ifeq ($(shell $(CC) -E -dD $(CFLAGS) include/arm_features.h | grep __SIZEOF_LONG__ | awk '{print $$3}'),4)
 CFLAGS += -D_FILE_OFFSET_BITS=64
@@ -696,6 +754,21 @@ $(info MAIN_LDLIBS: $(MAIN_LDLIBS))
 $(info )
 
 include Makefile
+
+ifeq ($(platform),orbis-dynamic)
+$(PS4_DYNAMIC_ALLOCATOR_STAMP): $(OO_PS4_TOOLCHAIN)/lib/libc.a
+	@mkdir -p $(PS4_DYNAMIC_ALLOCATOR_DIR)
+	@cd $(PS4_DYNAMIC_ALLOCATOR_DIR) && $(AR) x $(OO_PS4_TOOLCHAIN)/lib/libc.a $(PS4_DYNAMIC_ALLOCATOR_NAMES)
+	@touch $@
+
+$(PS4_DYNAMIC_STUB_DIR)/libkernel.so:
+	@mkdir -p $(PS4_DYNAMIC_STUB_DIR)
+	@ln -sf $(ORBISDEV)/usr/lib/libkernel_stub.so $@
+
+$(PS4_DYNAMIC_STUB_DIR)/libSceLibcInternal.so:
+	@mkdir -p $(PS4_DYNAMIC_STUB_DIR)
+	@ln -sf $(ORBISDEV)/usr/lib/libSceLibcInternal_stub.so $@
+endif
 
 # no special AS needed for gpu_neon
 plugins/gpu_neon/psx_gpu/psx_gpu_arm_neon.o: plugins/gpu_neon/psx_gpu/psx_gpu_arm_neon.S

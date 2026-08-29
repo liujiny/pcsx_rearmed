@@ -860,6 +860,11 @@ retry:
       if (cached_read || !cdrom_send_command_win32(stream, dir, xfer_buf_pos, request_len, cmd, cmd_len, sense, sizeof(sense)))
 #elif defined(__APPLE__)
       if (cached_read || !cdrom_send_command_macos(stream, dir, xfer_buf_pos, request_len, cmd, cmd_len, sense, sizeof(sense)))
+#elif defined(ORBIS)
+      /* Orbis cores use file-backed images; no physical optical-drive ioctl
+       * exists in the dynamic core environment. Keep cached-frame handling
+       * valid while making uncached physical-drive requests fail cleanly. */
+      if (cached_read)
 #endif
       {
          rv = 0;
