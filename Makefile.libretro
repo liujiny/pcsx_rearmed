@@ -356,7 +356,7 @@ else ifeq ($(platform), orbis-dynamic)
 	CXXFLAGS += -isystem $(shell $(CC) -print-resource-dir)/include
 	CXXFLAGS += -fshort-wchar -fPIC -fno-rtti
 	LDFLAGS += -nostdlib -nostartfiles -fuse-ld=lld -Wl,-m,elf_x86_64 -Wl,-pie -Wl,--no-dynamic-linker -Wl,--no-rosegment -Wl,-z,norelro -Wl,--export-dynamic
-	LDFLAGS += -Wl,--script,$(OO_PS4_TOOLCHAIN)/link.x -Wl,--eh-frame-hdr
+	LDFLAGS += -Wl,--script,$(CURDIR)/link-orbis-dynamic.x -Wl,--eh-frame-hdr
 	LDFLAGS += -Wl,--version-script=frontend/libretro-version-script
 	LDFLAGS += -Wl,--allow-multiple-definition
 	LDLIBS := $(filter-out -lm,$(LDLIBS))
