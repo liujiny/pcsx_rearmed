@@ -15,6 +15,15 @@ SECTIONS
 		*(.text .text.*)
 	}
 
+	/* Keep the dynamic-link metadata in its own page-aligned read-only LOAD,
+	 * matching the layout accepted by the PS4 module loader. */
+	.dynsym : ALIGN(0x4000) { *(.dynsym) }
+	.gnu.hash : { *(.gnu.hash) }
+	.hash : { *(.hash) }
+	.dynstr : { *(.dynstr) }
+	.rela.dyn : { *(.rela.dyn) }
+	.rela.plt : { *(.rela.plt) }
+
 	.rodata : ALIGN(0x10) {
 		*(.rodata .rodata.*)
 	}
@@ -26,6 +35,12 @@ SECTIONS
 	   __eh_frame_start = .;
 	   KEEP(*(.eh_frame))
 	   __eh_frame_end = .;
+	}
+
+	.eh_frame_hdr : {
+	   __eh_frame_hdr_start = .;
+	   KEEP(*(.eh_frame_hdr))
+	   __eh_frame_hdr_end = .;
 	}
 
 	.data.rel.ro : ALIGN(0x4000) {
@@ -75,7 +90,6 @@ SECTIONS
 
 	# Force .got.plt to appear, because SPRX requires a valid .got.plt.
 	/DISCARD/ : {
-		*(.eh_frame_hdr)
 		QUAD(_GLOBAL_OFFSET_TABLE_)
 	}
 }
