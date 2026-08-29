@@ -28,12 +28,6 @@ SECTIONS
 	   __eh_frame_end = .;
 	}
 
-	.eh_frame_hdr : {
-	   __eh_frame_hdr_start = .;
-	   KEEP(*(.eh_frame_hdr))
-	   __eh_frame_hdr_end = .;
-	}
-
 	.data.rel.ro : ALIGN(0x4000) {
 	   __data_relro_start = .;	
 	   KEEP(*(.data.rel.ro .data.rel.ro.*))
@@ -81,6 +75,7 @@ SECTIONS
 
 	# Force .got.plt to appear, because SPRX requires a valid .got.plt.
 	/DISCARD/ : {
+		*(.eh_frame_hdr)
 		QUAD(_GLOBAL_OFFSET_TABLE_)
 	}
 }
