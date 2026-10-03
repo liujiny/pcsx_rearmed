@@ -760,10 +760,9 @@ $(info )
 include Makefile
 
 ifeq ($(platform),orbis-dynamic)
-# Ensure generated allocator objects and Orbis import stubs exist before the
-# core's ELF link step.  Makefile's generic $(TARGET) rule only depends on
-# $(OBJS), so EXTRA_DEPS would otherwise be generated too late (or not at all).
-$(TARGET): $(EXTRA_DEPS)
+# Keep generated prerequisites out of the generic link recipe's $^.
+# Stubs must be linked via -l so their dependency names remain portable.
+$(TARGET): | $(EXTRA_DEPS)
 
 $(PS4_DYNAMIC_ALLOCATOR_STAMP): $(OO_PS4_TOOLCHAIN)/lib/libc.a
 	@mkdir -p $(PS4_DYNAMIC_ALLOCATOR_DIR)
