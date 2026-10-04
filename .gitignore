@@ -36,3 +36,9 @@ psx_gpu_offsets_update
 /tests/*.exe.*
 /tests/testcd.cue
 /tests/testcd.bin
+
+# Local PS4 build outputs
+*.elf
+*.oelf
+*.self
+/.orbis-dynamic-allocator/
